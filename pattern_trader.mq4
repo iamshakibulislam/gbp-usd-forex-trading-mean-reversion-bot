@@ -14,14 +14,20 @@
 input bool five_digit_broker = true; //Is this five digit broker
 input double stoplossOffset = 2;  //Stop loss offset
 //input double risk_percentage = 1; // Risk percentage
-input double riskreward = 2;  //Reward to Risk default 2:1
+input double riskreward = 3;  //Reward to Risk default 2:1
 input double risk_amount_in_dollar = 1.0;
 input bool is_mini_account = false;
 input double sl = 5;
 
+input double account_initial_balance = 0;
+input double challange_profit_target = 0; //challange profit target($) stop trading
+
+
 input double minimum_stoploss = 4; // Minumum Stoploss
 
 input double stop_comp_amount = 20;
+
+input double trailing_stop_pip = 5;
 
 
 //+------------------------------------------------------------------+
@@ -57,13 +63,18 @@ void OnDeinit(const int reason)
 
 double currop = 0.0;
 
+double curr_price_trailing_sell = Bid;
+double curr_price_trailing_buy = Ask;
+
 void OnTick()
   {
 //---
 
 
 
+trailing_stop();
 
+Print("account balance now",AccountBalance());
 
 
 //for buy trade
@@ -93,15 +104,14 @@ void OnTick()
       double sl = Ask - ((CalculatedPips)*Point*10);
       
       if(five_digit_broker == false){
-       double Tp = Ask+((CalculatedPips)*riskreward)*Point;
-       double sl = Ask - ((CalculatedPips)*Point);
+        Tp = Ask+((CalculatedPips)*riskreward)*Point;
+        sl = Ask - ((CalculatedPips)*Point);
       
       }
       
       if(lotsize != 0.00 && lotsize > 0 && (CalculatedPips)>=minimum_stoploss){
       
-      
-      /*
+    
       
       if(last_trade_profit() < 0.0 ){
       
@@ -127,7 +137,7 @@ void OnTick()
       
       }
       
-      */
+      
       
       int rsishift = 0;
       /*
@@ -154,18 +164,26 @@ void OnTick()
       double upperband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_UPPER,1);
       double lowerband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_LOWER,1);
       
+      double prev_upperband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_UPPER,2);
+      double prev_lowerband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_LOWER,2);
+      
       int ticket = 0;
       
       double op = Open[2];
       double cl = Close[2];
       
-      if (lowerband > Close[1] && Close[1] < Open[1] && rsival < 30){
+      if(AccountBalance() < challange_profit_target+account_initial_balance || challange_profit_target == 0){
+      
+      if (lowerband > Close[1] && Close[1] < Open[1] && rsival < 30 && lowerband < Close[2]  ){
       
       Print("bought");
       
-       ticket = OrderSend(Symbol(),OP_BUY,lotsize,Ask,2,sl,Tp,"traded from EA",9999,NULL,Blue);
+       ticket = OrderSend(Symbol(),OP_BUY,lotsize,Ask,2,sl,0,"traded from EA",9999,NULL,Blue);
+       curr_price_trailing_buy = Ask;
        currop = Open[0];
       
+         }
+         
          }
        
        if(ticket > 0){
@@ -173,7 +191,7 @@ void OnTick()
        
        Print("curr ticket is ",ticket);
          
-         write_into_file(ticket);
+         //write_into_file(ticket);
        
        
        
@@ -221,8 +239,8 @@ if(
       double sl = Bid + ((CalculatedPips)*Point*10);
       
       if(five_digit_broker == false){
-       double Tp = Bid-((CalculatedPips)*riskreward)*Point;
-       double sl = Bid + ((CalculatedPips)*Point);
+       Tp = Bid-((CalculatedPips)*riskreward)*Point;
+       sl = Bid + ((CalculatedPips)*Point);
       
       }
       
@@ -290,22 +308,34 @@ if(
       double lowerband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_LOWER,1);
       double upperband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_UPPER,1);
       
-      if(upperband < Close[1] && Close[1] > Open[1] && rsival > 70){
+      
+      double prev_upperband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_UPPER,2);
+      double prev_lowerband = iBands(NULL,0,20,2.5,0,PRICE_CLOSE,MODE_LOWER,2);
+      
+      if(AccountBalance() < challange_profit_target+account_initial_balance || challange_profit_target == 0){
+      
+      if(upperband < Close[1] && Close[1] > Open[1] && rsival > 70 && upperband > Close[2]){
       
       Print("sold");
       
-       ticket = OrderSend(Symbol(),OP_SELL,lotsize,Bid,2,sl,Tp,"traded from EA",9999,NULL,Blue);
+       ticket = OrderSend(Symbol(),OP_SELL,lotsize,Bid,2,sl,0,"traded from EA",9999,NULL,Blue);
+       curr_price_trailing_sell = Bid;
        
        currop = Open[0];
       
        }
+       
+       }
+       
+       
+       
       
       if(ticket > 0){
        //save the ticket into the file pending
        
        Print("ticket from sell side is ",ticket);
          
-         write_into_file(ticket);
+         //write_into_file(ticket);
        
        
        
@@ -767,3 +797,69 @@ int write_into_file(int ticket){
    return ticket;
 
 }
+
+
+
+bool trailing_stop(){
+
+if(OrdersTotal() > 0){
+
+   //check open orders -- and modify according to current price
+   
+   for(int i = 0 ; i < OrdersTotal() ; i++ ) { 
+                // We select the order of index i selecting by position and from the pool of market/pending trades.
+                OrderSelect( i, SELECT_BY_POS, MODE_TRADES ); 
+                double open_price = OrderOpenPrice();
+                
+                // If the pair of the order is equal to the pair where the EA is running.
+                if (OrderSymbol() == Symbol()){
+                
+                  //do modification here
+                  
+                  if(OrderType() == OP_SELL){
+                  
+                    double curr_price = Bid;
+                    
+                    if(open_price > curr_price && (curr_price -(trailing_stop_pip*Point*10)) <= curr_price_trailing_sell ){
+                    
+                    
+                        OrderModify(OrderTicket(),0,MathAbs(OrderStopLoss()-(curr_price_trailing_sell-curr_price)),0,0,Red);
+                        curr_price_trailing_sell = Bid;
+                    
+                    
+                    }
+                  
+                  }
+                
+                } 
+                
+                
+                //for buy trade trailing stop logic here
+                
+                if(OrderType() == OP_BUY){
+                  
+                    double curr_price = Ask;
+                    
+                    if(open_price < curr_price && curr_price >= curr_price_trailing_buy + (trailing_stop_pip*Point*10)){
+                    
+                    
+                        OrderModify(OrderTicket(),0,MathAbs(OrderStopLoss()+(curr_price-curr_price_trailing_buy)),0,0,Green);
+                        curr_price_trailing_buy = Ask;
+                    
+                    
+                    }
+                  
+                  }
+                
+                } 
+                
+                
+        } 
+
+
+return true;
+
+
+}
+
+
