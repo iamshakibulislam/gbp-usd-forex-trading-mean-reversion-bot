@@ -14,10 +14,10 @@
 input bool five_digit_broker = true; //Is this five digit broker
 input double stoplossOffset = 2;  //Stop loss offset
 //input double risk_percentage = 1; // Risk percentage
-input double riskreward = 3;  //Reward to Risk default 2:1
+input double riskreward = 20;  //Reward to Risk default 2:1
 input double risk_amount_in_dollar = 1.0;
 input bool is_mini_account = false;
-input double sl = 5;
+input double sl = 3;
 
 input double account_initial_balance = 0;
 input double challange_profit_target = 0; //challange profit target($) stop trading
@@ -178,7 +178,7 @@ Print("account balance now",AccountBalance());
       
       Print("bought");
       
-       ticket = OrderSend(Symbol(),OP_BUY,lotsize,Ask,2,sl,0,"traded from EA",9999,NULL,Blue);
+       ticket = OrderSend(Symbol(),OP_BUY,lotsize,Ask,2,sl,Tp,"traded from EA",9999,NULL,Blue);
        curr_price_trailing_buy = Ask;
        currop = Open[0];
       
@@ -318,7 +318,7 @@ if(
       
       Print("sold");
       
-       ticket = OrderSend(Symbol(),OP_SELL,lotsize,Bid,2,sl,0,"traded from EA",9999,NULL,Blue);
+       ticket = OrderSend(Symbol(),OP_SELL,lotsize,Bid,2,sl,Tp,"traded from EA",9999,NULL,Blue);
        curr_price_trailing_sell = Bid;
        
        currop = Open[0];
