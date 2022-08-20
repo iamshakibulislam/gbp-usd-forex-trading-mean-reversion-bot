@@ -14,10 +14,10 @@
 input bool five_digit_broker = true; //Is this five digit broker
 input double stoplossOffset = 2;  //Stop loss offset
 //input double risk_percentage = 1; // Risk percentage
-input double riskreward = 20;  //Reward to Risk default 2:1
+input double riskreward = 3.5;  //Reward to Risk default 2:1
 input double risk_amount_in_dollar = 1.0;
 input bool is_mini_account = false;
-input double sl = 3;
+input double sl = 6;
 
 input double account_initial_balance = 0;
 input double challange_profit_target = 0; //challange profit target($) stop trading
@@ -63,8 +63,8 @@ void OnDeinit(const int reason)
 
 double currop = 0.0;
 
-double curr_price_trailing_sell = Bid;
-double curr_price_trailing_buy = Ask;
+double curr_price_trailing_sell = 0;
+double curr_price_trailing_buy = 0;
 
 void OnTick()
   {
@@ -72,7 +72,7 @@ void OnTick()
 
 
 
-trailing_stop();
+//trailing_stop();
 
 Print("account balance now",AccountBalance());
 
@@ -112,6 +112,7 @@ Print("account balance now",AccountBalance());
       if(lotsize != 0.00 && lotsize > 0 && (CalculatedPips)>=minimum_stoploss){
       
     
+    /*
       
       if(last_trade_profit() < 0.0 ){
       
@@ -130,12 +131,16 @@ Print("account balance now",AccountBalance());
          
          }
          
+        
+         
          if(is_mini_account == true){
                   
                   lotsize = lotsize/10.0;
                }
       
       }
+      
+      */
       
       
       
@@ -179,7 +184,7 @@ Print("account balance now",AccountBalance());
       Print("bought");
       
        ticket = OrderSend(Symbol(),OP_BUY,lotsize,Ask,2,sl,Tp,"traded from EA",9999,NULL,Blue);
-       curr_price_trailing_buy = Ask;
+       curr_price_trailing_buy = 0;
        currop = Open[0];
       
          }
@@ -191,7 +196,7 @@ Print("account balance now",AccountBalance());
        
        Print("curr ticket is ",ticket);
          
-         //write_into_file(ticket);
+        // write_into_file(ticket);
        
        
        
@@ -275,6 +280,8 @@ if(
       
       */
       
+      
+      
       int rsishift = 0;
       /*
       
@@ -314,12 +321,12 @@ if(
       
       if(AccountBalance() < challange_profit_target+account_initial_balance || challange_profit_target == 0){
       
-      if(upperband < Close[1] && Close[1] > Open[1] && rsival > 70 && upperband > Close[2]){
+     if(upperband < Close[1] && Close[1] > Open[1] && rsival > 70 && upperband > Close[2]){
       
       Print("sold");
       
        ticket = OrderSend(Symbol(),OP_SELL,lotsize,Bid,2,sl,Tp,"traded from EA",9999,NULL,Blue);
-       curr_price_trailing_sell = Bid;
+       curr_price_trailing_sell = 0;
        
        currop = Open[0];
       
@@ -800,6 +807,9 @@ int write_into_file(int ticket){
 
 
 
+
+
+
 bool trailing_stop(){
 
 if(OrdersTotal() > 0){
@@ -818,38 +828,89 @@ if(OrdersTotal() > 0){
                   
                   if(OrderType() == OP_SELL){
                   
+                 
+                  
+                  
                     double curr_price = Bid;
                     
-                    if(open_price > curr_price && (curr_price -(trailing_stop_pip*Point*10)) <= curr_price_trailing_sell ){
+                    if( getPips(curr_price,open_price ) >= trailing_stop_pip){
+                    
+                        if(getPips(curr_price,open_price) > curr_price_trailing_sell){
+                        
+                        
+                        
+                           curr_price_trailing_sell = getPips(curr_price,open_price);
+                           
+                           double extra = curr_price_trailing_sell - trailing_stop_pip;
+                           
+                           
+                           
+                           
+                        
+                        
                     
                     
-                        OrderModify(OrderTicket(),0,MathAbs(OrderStopLoss()-(curr_price_trailing_sell-curr_price)),0,0,Red);
-                        curr_price_trailing_sell = Bid;
+                        OrderModify(OrderTicket(),0,MathAbs((open_price+(sl*Point*10))-(extra*Point*10)),0,0,Red);
+                        
+                        Comment("curr sell is ",curr_price_trailing_sell," and buy price is ",curr_price_trailing_buy);
+                        
+                        
+                        
+                        }
+                        
                     
                     
                     }
                   
                   }
+                  
+                  
+                  //buy order modify
+                  
                 
                 } 
                 
                 
                 //for buy trade trailing stop logic here
                 
-                if(OrderType() == OP_BUY){
+                 if(OrderType() == OP_BUY){
+                  
+                 
+                  
                   
                     double curr_price = Ask;
                     
-                    if(open_price < curr_price && curr_price >= curr_price_trailing_buy + (trailing_stop_pip*Point*10)){
+                    if( getPips(curr_price,open_price ) >= trailing_stop_pip){
+                    
+                        if(getPips(curr_price,open_price) > curr_price_trailing_buy){
+                        
+                        
+                        
+                           curr_price_trailing_buy = getPips(curr_price,open_price);
+                           
+                           double extra = curr_price_trailing_buy - trailing_stop_pip;
+                           
+                           
+                           
+                           
+                        
+                        
                     
                     
-                        OrderModify(OrderTicket(),0,MathAbs(OrderStopLoss()+(curr_price-curr_price_trailing_buy)),0,0,Green);
-                        curr_price_trailing_buy = Ask;
+                        OrderModify(OrderTicket(),0,MathAbs((open_price-(sl*Point*10))+(extra*Point*10)),0,0,Red);
+                        
+                        
+                        }
+                        
                     
                     
                     }
                   
                   }
+                
+                //end of buy trade modification
+                
+               
                 
                 } 
                 
@@ -861,5 +922,6 @@ return true;
 
 
 }
+
 
 
